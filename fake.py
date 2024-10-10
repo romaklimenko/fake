@@ -16,76 +16,26 @@ This script is used to generate fake data for Master Data Management (MDM) syste
     - links to Salesforce Contacts
 - Salesforce
  - Contacts
+    - links to Organizations
  - Organizations
 """
 
 import glob
-import json
 import os
 import random
-from dataclasses import dataclass
+from typing import List
 
 from faker import Faker
 
-# CRM
+from utils import save_to_json, typo
 
-
-@dataclass
-class CRMContact:
-    id: str
-    first_name: str
-    last_name: str
-    email: str
-    organization_id: str
-    hr_employee_id: str
-    salesforce_contact_id: str
-
-
-@dataclass
-class CRMOrganization:
-    id: str
-    name: str
-    salesforce_organization_id: str
-
-# HR
-
-
-@dataclass
-class HRDepartment:
-    Id: str
-    Name: str
-
-
-@dataclass
-class HREmployee:
-    Id: str
-    Name: str
-    Surname: str
-    Email: str
-    DepartmentId: str
-    ManagerId: str
-    SalesforceContactId: str
-
-# Salesforce
-
-
-@dataclass
-class SalesforceContact:
-    ID: str
-    FirstName: str
-    LastName: str
-    Email: str
-
-
-@dataclass
-class SalesforceOrganization:
-    ID: str
-    Name: str
-
-
-def save_to_json(data, filename):
-    with open(filename, 'w', encoding='utf8') as f:
-        json.dump([d.__dict__ for d in data], f, indent=2)
+from data_classes import (
+    CRMContact,
+    CRMOrganization,
+    HRDepartment,
+    HREmployee,
+    SalesforceContact,
+    SalesforceOrganization)
 
 
 def main():
@@ -98,12 +48,12 @@ def main():
     else:
         os.makedirs('./data')
 
-    crm_contacts = []
-    crm_organizations = []
-    hr_departments = []
-    hr_employees = []
-    salesforce_contacts = []
-    salesforce_organizations = []
+    crm_contacts: List[CRMContact] = []
+    crm_organizations: List[CRMOrganization] = []
+    hr_departments: List[HRDepartment] = []
+    hr_employees: List[HREmployee] = []
+    salesforce_contacts: List[SalesforceContact] = []
+    salesforce_organizations: List[SalesforceOrganization] = []
 
     # Config
 
@@ -182,43 +132,121 @@ def main():
                 ID=fake.uuid4(),
                 FirstName=fake.first_name(),
                 LastName=fake.last_name(),
-                Email=fake.email()
+                Email=fake.email(),
+                Address=fake.address(),
+                OrganizationID=None
             ))
 
     for _ in range(num_salesforce_organizations):
         salesforce_organizations.append(
             SalesforceOrganization(
                 ID=fake.uuid4(),
-                Name=fake.company()
+                Name=fake.company(),
+                Address=fake.address()
             ))
 
+    # Mix it up
+
+    used_ids = set()
+
+    # CRM Contacts
+
+    # organization_id: Optional[str]
     for crm_contact in random.sample(crm_contacts, num_crm_contacts_to_organizations):
         crm_contact.organization_id = random.choice(crm_organizations).id
 
-    for crm_contact in random.sample(crm_contacts, num_crm_contacts_to_hr_employees):
-        crm_contact.hr_employee_id = random.choice(hr_employees).Id
+    # hr_employee_id: Optional[str]
+    for crm_contact in random.sample(
+            [contact for contact in crm_contacts if contact.id not in used_ids],
+            num_crm_contacts_to_hr_employees):
 
-    for crm_contact in random.sample(crm_contacts, num_crm_contacts_to_salesforce_contacts):
-        crm_contact.salesforce_contact_id = random.choice(
-            salesforce_contacts).ID
+        hr_employee = random.choice(hr_employees)
 
+        if hr_employee.Id in used_ids:
+            continue
+
+        used_ids.add(crm_contact.id)
+        used_ids.add(hr_employee.Id)
+
+        crm_contact.hr_employee_id = hr_employee.Id
+        crm_contact.first_name = typo(hr_employee.Name)
+        crm_contact.last_name = typo(hr_employee.Surname)
+        if random.random() > 0.5:
+            crm_contact.email = typo(
+                hr_employee.Email, unchanged_probability=0.9)
+
+    # salesforce_contact_id: Optional[str]
+    for crm_contact in random.sample(
+            [contact for contact in crm_contacts if contact.id not in used_ids],
+            num_crm_contacts_to_salesforce_contacts):
+
+        if crm_contact.id in used_ids:
+            continue
+
+        used_ids.add(crm_contact.id)
+        used_ids.add(crm_contact.id)
+
+        salesforce_contact = random.choice(salesforce_contacts)
+        crm_contact.salesforce_contact_id = salesforce_contact.ID
+        crm_contact.first_name = typo(salesforce_contact.FirstName)
+        crm_contact.last_name = typo(salesforce_contact.LastName)
+        crm_contact.email = typo(
+            salesforce_contact.Email, unchanged_probability=0.9)
+
+    # CRM Organizations
+
+    # salesforce_organization_id: Optional[str]
     for crm_organization in random.sample(
-            crm_organizations, num_crm_organizations_to_salesforce_organizations):
-        crm_organization.salesforce_organization_id = random.choice(
-            salesforce_organizations).ID
+            [organization for organization in crm_organizations if organization.id not in used_ids],
+            num_crm_organizations_to_salesforce_organizations):
 
-    for hr_employee in random.sample(hr_employees, num_hr_employees_to_salesforce_contacts):
-        hr_employee.SalesforceContactId = random.choice(
-            salesforce_contacts).ID
+        salesforce_organization = random.choice(salesforce_organizations)
 
+        if salesforce_organization.ID in used_ids:
+            continue
+
+        used_ids.add(crm_organization.id)
+        used_ids.add(salesforce_organization.ID)
+
+        crm_organization.salesforce_organization_id = salesforce_organization.ID
+        crm_organization.name = typo(salesforce_organization.Name)
+
+    # HR Employees
+
+    # DepartmentId: Optional[str]
     for hr_employee in hr_employees:
         hr_employee.DepartmentId = random.choice(hr_departments).Id
 
+    # ManagerId: Optional[str]
     for hr_department in hr_departments:
         department_employees = [
             employee for employee in hr_employees if employee.DepartmentId == hr_department.Id]
         for employee in department_employees:
             employee.ManagerId = random.choice(department_employees).Id
+
+    # SalesforceContactId: Optional[str]
+    for hr_employee in random.sample(
+            [employee for employee in hr_employees if employee.Id not in used_ids],
+            num_hr_employees_to_salesforce_contacts):
+
+        salesforce_contact = random.choice(salesforce_contacts)
+
+        if salesforce_contact.ID in used_ids:
+            continue
+
+        used_ids.add(hr_employee.Id)
+        used_ids.add(salesforce_contact.ID)
+
+        hr_employee.SalesforceContactId = salesforce_contact.ID
+        hr_employee.Name = typo(salesforce_contact.FirstName)
+        hr_employee.Surname = typo(salesforce_contact.LastName)
+        hr_employee.Email = typo(
+            salesforce_contact.Email, unchanged_probability=0.9)
+
+    # Salesforce Contacts
+    for salesforce_contact in salesforce_contacts:
+        salesforce_contact.OrganizationID = random.choice(
+            salesforce_organizations).ID
 
     # Save to json
     save_to_json(crm_contacts, './data/crm_contacts.json')
@@ -230,5 +258,5 @@ def main():
                  './data/salesforce_organizations.json')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
