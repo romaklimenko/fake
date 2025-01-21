@@ -25,17 +25,15 @@ import os
 import random
 from typing import List
 
+from dotenv import load_dotenv
 from faker import Faker
 
-from utils import save_to_json, typo
+from data_classes import (CRMContact, CRMOrganization, HRDepartment,
+                          HREmployee, SalesforceContact,
+                          SalesforceOrganization)
+from utils import mess_up_email, save_to_json, typo
 
-from data_classes import (
-    CRMContact,
-    CRMOrganization,
-    HRDepartment,
-    HREmployee,
-    SalesforceContact,
-    SalesforceOrganization)
+load_dotenv()
 
 
 def main():
@@ -57,8 +55,8 @@ def main():
 
     # Config
 
-    num_crm_contacts = 1_000
-    num_crm_organizations = 100
+    num_crm_contacts: int = int(os.getenv('NUM_CRM_CONTACTS', '1000'))
+    num_crm_organizations: int = int(os.getenv('NUM_CRM_ORGANIZATIONS', '100'))
 
     hr_department_names = [
         'Finance',
@@ -71,78 +69,107 @@ def main():
         'Legal',
         'R&D',
         'Production']
-    num_hr_employees = 1_000
+    num_hr_employees: int = int(os.getenv('NUM_HR_EMPLOYEES', '1000'))
 
-    num_salesforce_contacts = 1_000
-    num_salesforce_organizations = 100
+    num_salesforce_contacts: int = int(
+        os.getenv('NUM_SALESFORCE_CONTACTS', '1000'))
+    num_salesforce_organizations: int = int(
+        os.getenv('NUM_SALESFORCE_ORGANIZATIONS', '100'))
 
-    num_crm_contacts_to_organizations = int(num_crm_contacts / 2)
-    num_crm_contacts_to_hr_employees = int(num_crm_contacts / 2)
-    num_crm_contacts_to_salesforce_contacts = int(num_crm_contacts / 2)
+    num_crm_contacts_to_organizations: int = int(
+        os.getenv('NUM_CRM_CONTACTS_TO_ORGANIZATIONS', num_crm_contacts // 2))
+    num_crm_contacts_to_hr_employees: int = int(
+        os.getenv('NUM_CRM_CONTACTS_TO_HR_EMPLOYEES', num_crm_contacts // 2))
+    num_crm_contacts_to_salesforce_contacts: int = int(
+        os.getenv('NUM_CRM_CONTACTS_TO_SALESFORCE_CONTACTS', num_crm_contacts // 2))
 
-    num_crm_organizations_to_salesforce_organizations = int(
-        num_crm_organizations / 2)
+    num_crm_organizations_to_salesforce_organizations: int = int(
+        os.getenv('NUM_CRM_ORGANIZATIONS_TO_SALESFORCE_ORGANIZATIONS', num_crm_organizations // 2))
 
-    num_hr_employees_to_salesforce_contacts = int(num_hr_employees / 2)
+    num_hr_employees_to_salesforce_contacts: int = int(
+        os.getenv('NUM_HR_EMPLOYEES_TO_SALESFORCE_CONTACTS', num_hr_employees // 2))
 
     fake = Faker()
 
+    def random_date_pair():
+        date1 = fake.date_time_between(start_date='-1y', end_date='now')
+        date2 = fake.date_time_between(start_date=date1, end_date='now')
+        return date1.isoformat(), date2.isoformat()
+
     for _ in range(num_crm_contacts):
+        created_at, modified_at = random_date_pair()
         crm_contacts.append(
             CRMContact(
                 id=fake.uuid4(),
                 first_name=fake.first_name(),
                 last_name=fake.last_name(),
-                email=fake.email(),
+                email=mess_up_email(fake.email()),
                 organization_id=None,
                 hr_employee_id=None,
-                salesforce_contact_id=None
+                salesforce_contact_id=None,
+                created_at=created_at,
+                modified_at=modified_at,
             ))
 
     for _ in range(num_crm_organizations):
+        created_at, modified_at = random_date_pair()
         crm_organizations.append(
             CRMOrganization(
                 id=fake.uuid4(),
                 name=fake.company(),
-                salesforce_organization_id=None
+                salesforce_organization_id=None,
+                created_at=created_at,
+                modified_at=modified_at,
             ))
 
     for hr_department_name in hr_department_names:
+        created_at, modified_at = random_date_pair()
         hr_departments.append(
             HRDepartment(
                 Id=fake.uuid4(),
-                Name=hr_department_name
+                Name=hr_department_name,
+                created_at=created_at,
+                modified_at=modified_at,
             ))
 
     for _ in range(num_hr_employees):
+        created_at, modified_at = random_date_pair()
         hr_employees.append(
             HREmployee(
                 Id=fake.uuid4(),
                 Name=fake.first_name(),
                 Surname=fake.last_name(),
-                Email=fake.email(),
+                Email=mess_up_email(fake.email()),
                 DepartmentId=None,
                 ManagerId=None,
-                SalesforceContactId=None
+                SalesforceContactId=None,
+                created_at=created_at,
+                modified_at=modified_at,
             ))
 
     for _ in range(num_salesforce_contacts):
+        сreated_at, modified_at = random_date_pair()
         salesforce_contacts.append(
             SalesforceContact(
                 ID=fake.uuid4(),
                 FirstName=fake.first_name(),
                 LastName=fake.last_name(),
-                Email=fake.email(),
+                Email=mess_up_email(fake.email()),
                 Address=fake.address(),
-                OrganizationID=None
+                OrganizationID=None,
+                created_at=сreated_at,
+                modified_at=modified_at,
             ))
 
     for _ in range(num_salesforce_organizations):
+        created_at, modified_at = random_date_pair()
         salesforce_organizations.append(
             SalesforceOrganization(
                 ID=fake.uuid4(),
                 Name=fake.company(),
-                Address=fake.address()
+                Address=fake.address(),
+                created_at=created_at,
+                modified_at=modified_at,
             ))
 
     # Mix it up
@@ -190,8 +217,11 @@ def main():
         crm_contact.salesforce_contact_id = salesforce_contact.ID
         crm_contact.first_name = typo(salesforce_contact.FirstName)
         crm_contact.last_name = typo(salesforce_contact.LastName)
-        crm_contact.email = typo(
-            salesforce_contact.Email, unchanged_probability=0.9)
+        crm_contact.email = mess_up_email(
+            typo(
+                salesforce_contact.Email,
+                unchanged_probability=0.9),
+            unchanged_probability=0.9)
 
     # CRM Organizations
 
@@ -240,8 +270,11 @@ def main():
         hr_employee.SalesforceContactId = salesforce_contact.ID
         hr_employee.Name = typo(salesforce_contact.FirstName)
         hr_employee.Surname = typo(salesforce_contact.LastName)
-        hr_employee.Email = typo(
-            salesforce_contact.Email, unchanged_probability=0.9)
+        hr_employee.Email = mess_up_email(
+            typo(
+                salesforce_contact.Email,
+                unchanged_probability=0.9),
+            unchanged_probability=0.9)
 
     # Salesforce Contacts
     for salesforce_contact in salesforce_contacts:

@@ -1,11 +1,17 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
+@dataclass
+class BaseModel:
+    created_at: str
+    modified_at: str
+
 # CRM
 
 
 @dataclass
-class CRMContact:
+class CRMContact(BaseModel):
     id: str
     first_name: str
     last_name: str
@@ -16,7 +22,7 @@ class CRMContact:
 
 
 @dataclass
-class CRMOrganization:
+class CRMOrganization(BaseModel):
     id: str
     name: str
     salesforce_organization_id: Optional[str]
@@ -25,13 +31,13 @@ class CRMOrganization:
 
 
 @dataclass
-class HRDepartment:
+class HRDepartment(BaseModel):
     Id: str
     Name: str
 
 
 @dataclass
-class HREmployee:
+class HREmployee(BaseModel):
     Id: str
     Name: str
     Surname: str
@@ -44,7 +50,7 @@ class HREmployee:
 
 
 @dataclass
-class SalesforceContact:
+class SalesforceContact(BaseModel):
     ID: str
     FirstName: str
     LastName: str
@@ -54,7 +60,7 @@ class SalesforceContact:
 
 
 @dataclass
-class SalesforceOrganization:
+class SalesforceOrganization(BaseModel):
     ID: str
     Name: str
     Address: str

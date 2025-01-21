@@ -24,9 +24,13 @@ def save_to_json(data, filename):
     with open(filename, 'w', encoding='utf8') as f:
         json.dump([d.__dict__ for d in data], f, indent=2)
 
+def mess_up_email(email: str, unchanged_probability: float = 0.9):
+    if random.random() > unchanged_probability:
+        return email.replace('@', '_at_')
+    return email
 
-def typo(word, unchanged_probability=0.5):
-    if random.random() < unchanged_probability:
+def typo(word, unchanged_probability: float = 0.5):
+    if random.random() > unchanged_probability:
         return word
 
     word_list = list(word)
